@@ -41,6 +41,6 @@ A Flutter-based mobile application for managing and discovering recipes.
 
 ## Important
 
-This Firebase configuration is for testing only. Do not use it for production or submit any sensitive data.
+This Firebase configuration is for testing only.
 
 For any issues, contact ntshabasimukelo@gmail.com.

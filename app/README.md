@@ -1,16 +1,46 @@
-# app
+# Recipe Book App
 
-A new Flutter project.
+A Flutter-based mobile application for managing and discovering recipes.
 
-## Getting Started
+## Prerequisites
 
-This project is a starting point for a Flutter application.
+- Flutter SDK 3.24.3
+- Dart SDK 3.5.3
+- Android Studio 2024.2 or VS Code 1.94.1
+- Java JDK 17 (OpenJDK 17.0.12 or later)
+- Xcode 16.0 (for iOS)
+- CocoaPods 1.15.2 (for iOS)
 
-A few resources to get you started if this is your first Flutter project:
+## Setup
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+1. Clone the repository:
+   ```
+   git clone https://github.com/your-username/recipe-book-app.git
+   cd recipe-book-app/app
+   ```
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+2. Install dependencies:
+   ```
+   flutter pub get
+   ```
+
+3. Firebase Configuration:
+   - iOS:
+     - App ID: 1:1044766290238:ios:db6b68f6fb2c3ad13abc6f
+     - Bundle ID: com.example.app
+   - Android:
+     - App ID: 1:1044766290238:android:54d936a6fe01ca353abc6f
+     - Package name: com.example.app
+
+   Note: Firebase configuration files are included for testing purposes.
+
+4. Run the app:
+   ```
+   flutter run
+   ```
+
+## Important
+
+This Firebase configuration is for testing only. Do not use it for production or submit any sensitive data.
+
+For any issues, contact ntshabasimukelo@gmail.com.

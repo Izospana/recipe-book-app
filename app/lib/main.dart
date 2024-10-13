@@ -26,7 +26,7 @@ class MyApp extends StatelessWidget {
         primarySwatch: Colors.green,
         visualDensity: VisualDensity.adaptivePlatformDensity,
       ),
-      home: const RecipeListScreen(),
+      home: RecipeListScreen(),
     );
   }
 }

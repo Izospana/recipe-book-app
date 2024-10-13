@@ -3,184 +3,191 @@ import 'package:provider/provider.dart';
 import '../providers/recipe_provider.dart';
 
 class AddRecipeScreen extends StatefulWidget {
-  const AddRecipeScreen({super.key});
-
   @override
   _AddRecipeScreenState createState() => _AddRecipeScreenState();
 }
 
 class _AddRecipeScreenState extends State<AddRecipeScreen> {
   final _formKey = GlobalKey<FormState>();
-  String _name = '';
-  String _description = '';
-  String _imageUrl = '';
-  final List<String> _ingredients = [''];
-  final List<String> _instructions = [''];
-  String _cookingTime = '';
+  final _nameController = TextEditingController();
+  final _descriptionController = TextEditingController();
+  final _imageUrlController = TextEditingController();
+  final List<TextEditingController> _ingredientControllers = [TextEditingController()];
+  final List<TextEditingController> _instructionControllers = [TextEditingController()];
+  final _cookingTimeController = TextEditingController();
   String _type = 'Non-Vegetarian';
+  bool _isLoading = false;
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _descriptionController.dispose();
+    _imageUrlController.dispose();
+    for (var controller in _ingredientControllers) {
+      controller.dispose();
+    }
+    for (var controller in _instructionControllers) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
 
   void _addIngredient() {
     setState(() {
-      _ingredients.add('');
+      _ingredientControllers.add(TextEditingController());
     });
   }
 
   void _addInstruction() {
     setState(() {
-      _instructions.add('');
+      _instructionControllers.add(TextEditingController());
     });
   }
 
-  void _submitForm() {
+  Future<void> _submitForm() async {
     if (_formKey.currentState!.validate()) {
-      _formKey.currentState!.save();
-      Provider.of<RecipeProvider>(context, listen: false).addRecipe({
-        'name': _name.toLowerCase(),
-        'displayName': _name,
-        'description': _description,
-        'image_url': _imageUrl,
-        'ingredients': _ingredients,
-        'instructions': _instructions,
-        'cooking_time': _cookingTime,
-        'type': _type,
-        'createdAt': DateTime.now(),
-        'ratings': [],
-        'averageRating': 0.0,
+      setState(() {
+        _isLoading = true;
       });
-      Navigator.pop(context);
+
+      final recipe = {
+        'name': _nameController.text,
+        'description': _descriptionController.text,
+        'image_url': _imageUrlController.text,
+        'ingredients': _ingredientControllers.map((c) => c.text).toList(),
+        'instructions': _instructionControllers.map((c) => c.text).toList(),
+        'type': _type,
+        'cooking_time': _cookingTimeController.text,
+      };
+
+      try {
+        await Provider.of<RecipeProvider>(context, listen: false).addRecipe(recipe);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Recipe added successfully!'), backgroundColor: Colors.orange),
+        );
+        Navigator.pop(context, true);
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to add recipe. Please try again.'), backgroundColor: Colors.red),
+        );
+      } finally {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
+  }
+
+  Widget _buildTextField(TextEditingController controller, String label, {int maxLines = 1}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16.0),
+      child: TextFormField(
+        controller: controller,
+        maxLines: maxLines,
+        decoration: InputDecoration(
+          labelText: label,
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+          filled: true,
+          fillColor: Colors.grey[200],
+        ),
+        validator: (value) => value!.isEmpty ? 'This field is required' : null,
+      ),
+    );
+  }
+
+  Widget _buildDynamicList(String title, List<TextEditingController> controllers, Function() addFunction) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        SizedBox(height: 8),
+        ...controllers.asMap().entries.map(
+              (entry) => Padding(
+                padding: const EdgeInsets.only(bottom: 8.0),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: entry.value,
+                        decoration: InputDecoration(
+                          labelText: '${title.substring(0, title.length - 1)} ${entry.key + 1}',
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                          filled: true,
+                          fillColor: Colors.grey[200],
+                        ),
+                        validator: (value) => value!.isEmpty ? 'This field is required' : null,
+                      ),
+                    ),
+                    IconButton(
+                      icon: Icon(Icons.remove_circle, color: Colors.red),
+                      onPressed: () => setState(() => controllers.removeAt(entry.key)),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        TextButton.icon(
+          onPressed: addFunction,
+          icon: Icon(Icons.add, color: Colors.orange),
+          label: Text('Add ${title.substring(0, title.length - 1)}', style: TextStyle(color: Colors.orange)),
+        ),
+        SizedBox(height: 16),
+      ],
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Add Recipe'),
+        title: Text('Add Recipe'),
+        backgroundColor: Colors.orange,
       ),
-      body: Form(
-        key: _formKey,
-        child: ListView(
+      body: SingleChildScrollView(
+        child: Padding(
           padding: const EdgeInsets.all(16.0),
-          children: [
-            TextFormField(
-              decoration: const InputDecoration(labelText: 'Recipe Name'),
-              validator: (value) => value!.isEmpty ? 'Please enter a name' : null,
-              onSaved: (value) => _name = value!,
-            ),
-            TextFormField(
-              decoration: const InputDecoration(labelText: 'Description'),
-              validator: (value) => value!.isEmpty ? 'Please enter a description' : null,
-              onSaved: (value) => _description = value!,
-            ),
-            TextFormField(
-              decoration: const InputDecoration(labelText: 'Image URL'),
-              validator: (value) => value!.isEmpty ? 'Please enter an image URL' : null,
-              onSaved: (value) => _imageUrl = value!,
-            ),
-            DropdownButtonFormField<String>(
-              value: _type,
-              decoration: const InputDecoration(labelText: 'Recipe Type'),
-              items: <String>['Vegan', 'Vegetarian', 'Non-Vegetarian']
-                  .map<DropdownMenuItem<String>>((String value) {
-                return DropdownMenuItem<String>(
-                  value: value,
-                  child: Text(value),
-                );
-              }).toList(),
-              onChanged: (String? newValue) {
-                setState(() {
-                  _type = newValue!;
-                });
-              },
-            ),
-            const SizedBox(height: 16),
-            Text('Ingredients', style: Theme.of(context).textTheme.titleMedium),
-            ..._ingredients.asMap().entries.map((entry) {
-              return Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8.0),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: TextFormField(
-                        decoration: InputDecoration(labelText: 'Ingredient ${entry.key + 1}'),
-                        validator: (value) => value!.isEmpty ? 'Please enter an ingredient' : null,
-                        onSaved: (value) => _ingredients[entry.key] = value!,
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.remove_circle, color: Colors.red),
-                      onPressed: () {
-                        setState(() {
-                          _ingredients.removeAt(entry.key);
-                        });
-                      },
-                    ),
-                  ],
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _buildTextField(_nameController, 'Recipe Name'),
+                _buildTextField(_descriptionController, 'Description', maxLines: 3),
+                _buildTextField(_imageUrlController, 'Image URL'),
+                DropdownButtonFormField<String>(
+                  value: _type,
+                  decoration: InputDecoration(
+                    labelText: 'Recipe Type',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                    filled: true,
+                    fillColor: Colors.grey[200],
+                  ),
+                  items: ['Vegan', 'Vegetarian', 'Non-Vegetarian']
+                      .map((type) => DropdownMenuItem(value: type, child: Text(type)))
+                      .toList(),
+                  onChanged: (value) => setState(() => _type = value!),
                 ),
-              );
-            }),
-            ElevatedButton(
-              onPressed: _addIngredient,
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-              child: const Text('Add Ingredient'),
-            ),
-            const SizedBox(height: 16),
-            Text('Instructions', style: Theme.of(context).textTheme.titleMedium),
-            ..._instructions.asMap().entries.map((entry) {
-              return Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8.0),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    CircleAvatar(
-                      radius: 12,
-                      backgroundColor: Colors.green,
-                      child: Text(
-                        '${entry.key + 1}',
-                        style: const TextStyle(color: Colors.white, fontSize: 12),
+                SizedBox(height: 16),
+                _buildDynamicList('Ingredients', _ingredientControllers, _addIngredient),
+                _buildDynamicList('Instructions', _instructionControllers, _addInstruction),
+                _buildTextField(_cookingTimeController, 'Cooking Time'),
+                SizedBox(height: 24),
+                _isLoading
+                    ? Center(child: CircularProgressIndicator(color: Colors.orange))
+                    : ElevatedButton(
+                        onPressed: _submitForm,
+                        child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Text('Submit Recipe', style: TextStyle(fontSize: 18)),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.orange,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: TextFormField(
-                        decoration: InputDecoration(labelText: 'Instruction ${entry.key + 1}'),
-                        validator: (value) => value!.isEmpty ? 'Please enter an instruction' : null,
-                        onSaved: (value) => _instructions[entry.key] = value!,
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.remove_circle, color: Colors.red),
-                      onPressed: () {
-                        setState(() {
-                          _instructions.removeAt(entry.key);
-                        });
-                      },
-                    ),
-                  ],
-                ),
-              );
-            }),
-            ElevatedButton(
-              onPressed: _addInstruction,
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-              child: const Text('Add Instruction'),
+              ],
             ),
-            const SizedBox(height: 16),
-            TextFormField(
-              decoration: const InputDecoration(labelText: 'Cooking Time'),
-              validator: (value) => value!.isEmpty ? 'Please enter cooking time' : null,
-              onSaved: (value) => _cookingTime = value!,
-            ),
-            const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: _submitForm,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-              ),
-              child: const Text('Submit Recipe'),
-            ),
-          ],
+          ),
         ),
       ),
     );

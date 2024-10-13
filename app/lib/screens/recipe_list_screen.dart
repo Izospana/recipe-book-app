@@ -7,35 +7,60 @@ import 'add_recipe_screen.dart';
 import 'favorite_recipes_screen.dart';
 
 class RecipeListScreen extends StatefulWidget {
-  const RecipeListScreen({super.key});
-
   @override
   _RecipeListScreenState createState() => _RecipeListScreenState();
 }
 
 class _RecipeListScreenState extends State<RecipeListScreen> {
+  final ScrollController _scrollController = ScrollController();
   final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(_onScroll);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Provider.of<RecipeProvider>(context, listen: false).loadRecipes();
+      Provider.of<RecipeProvider>(context, listen: false).loadRecipes(refresh: true);
     });
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels == _scrollController.position.maxScrollExtent) {
+      Provider.of<RecipeProvider>(context, listen: false).loadRecipes();
+    }
+  }
+
+  void _scrollToTop() {
+    if (_scrollController.hasClients) {
+      _scrollController.animateTo(
+        0,
+        duration: Duration(milliseconds: 500),
+        curve: Curves.easeOut,
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Recipe Book', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: Text('Recipe Book', style: TextStyle(fontWeight: FontWeight.bold)),
+        backgroundColor: Colors.orange,
         actions: [
           IconButton(
-            icon: const Icon(Icons.favorite),
+            icon: Icon(Icons.favorite),
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const FavoriteRecipesScreen()),
+                MaterialPageRoute(builder: (context) => FavoriteRecipesScreen()),
               );
             },
           ),
@@ -44,18 +69,20 @@ class _RecipeListScreenState extends State<RecipeListScreen> {
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.all(8.0),
+            padding: const EdgeInsets.all(16.0),
             child: TextField(
               controller: _searchController,
               decoration: InputDecoration(
                 hintText: 'Search recipes...',
-                prefixIcon: const Icon(Icons.search),
+                prefixIcon: Icon(Icons.search, color: Colors.orange),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(30),
-                  borderSide: BorderSide.none,
+                  borderSide: BorderSide(color: Colors.orange),
                 ),
-                filled: true,
-                fillColor: Colors.grey[200],
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(30),
+                  borderSide: BorderSide(color: Colors.orange, width: 2),
+                ),
               ),
               onChanged: (value) {
                 Provider.of<RecipeProvider>(context, listen: false).searchRecipes(value);
@@ -67,11 +94,11 @@ class _RecipeListScreenState extends State<RecipeListScreen> {
               return SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: Padding(
-                  padding: const EdgeInsets.all(8.0),
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
                   child: Row(
                     children: ['All', 'Vegan', 'Vegetarian', 'Non-Vegetarian']
                         .map((filter) => Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                              padding: const EdgeInsets.only(right: 8.0),
                               child: FilterChip(
                                 label: Text(filter),
                                 selected: recipeProvider.selectedFilter == filter,
@@ -80,7 +107,8 @@ class _RecipeListScreenState extends State<RecipeListScreen> {
                                     recipeProvider.setFilter(filter);
                                   }
                                 },
-                                selectedColor: Theme.of(context).primaryColor.withOpacity(0.3),
+                                selectedColor: Colors.orange.withOpacity(0.3),
+                                checkmarkColor: Colors.orange,
                               ),
                             ))
                         .toList(),
@@ -92,27 +120,32 @@ class _RecipeListScreenState extends State<RecipeListScreen> {
           Expanded(
             child: Consumer<RecipeProvider>(
               builder: (context, recipeProvider, child) {
-                if (recipeProvider.isLoading) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                if (recipeProvider.filteredRecipes.isEmpty) {
-                  return const Center(child: Text('No recipes found'));
+                if (recipeProvider.isLoading && recipeProvider.recipes.isEmpty) {
+                  return Center(child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Colors.orange)));
                 }
                 return ListView.builder(
-                  itemCount: recipeProvider.filteredRecipes.length,
+                  controller: _scrollController,
+                  itemCount: recipeProvider.filteredRecipes.length + (recipeProvider.hasMore ? 1 : 0),
                   itemBuilder: (context, index) {
-                    var recipeDoc = recipeProvider.filteredRecipes[index];
-                    var recipe = recipeDoc.data() as Map<String, dynamic>;
-                    recipe['id'] = recipeDoc.id;
+                    if (index == recipeProvider.filteredRecipes.length) {
+                      return Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Center(
+                          child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Colors.orange)),
+                        ),
+                      );
+                    }
+                    var recipe = recipeProvider.filteredRecipes[index].data() as Map<String, dynamic>;
+                    recipe['id'] = recipeProvider.filteredRecipes[index].id;
                     return RecipeCard(
                       recipe: recipe,
-                      isFavorite: recipeProvider.favoriteRecipes.contains(recipeDoc.id),
-                      onFavoriteToggle: () => recipeProvider.toggleFavorite(recipeDoc.id),
+                      isFavorite: recipeProvider.favoriteRecipes.contains(recipe['id']),
+                      onFavoriteToggle: () => recipeProvider.toggleFavorite(recipe['id']),
                       onTap: () {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => RecipeDetailScreen(recipeId: recipeDoc.id),
+                            builder: (context) => RecipeDetailScreen(recipeId: recipe['id']),
                           ),
                         );
                       },
@@ -125,14 +158,15 @@ class _RecipeListScreenState extends State<RecipeListScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          Navigator.push(
+        onPressed: () async {
+          await Navigator.push(
             context,
-            MaterialPageRoute(builder: (context) => const AddRecipeScreen()),
+            MaterialPageRoute(builder: (context) => AddRecipeScreen()),
           );
+          _scrollToTop();
         },
-        backgroundColor: Colors.green,
-        child: const Icon(Icons.add),
+        child: Icon(Icons.add),
+        backgroundColor: Colors.orange,
       ),
     );
   }
